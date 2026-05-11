@@ -1,0 +1,16 @@
+# Node
+node_modules/
+dist/
+
+# Laravel
+vendor/
+.env
+/public/build
+/storage/*.key
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

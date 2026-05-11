@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 320 40% 98%;
+    --foreground: 262 55% 18%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 262 55% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 262 55% 18%;
+
+    /* MAIN GYNOCARE PURPLE */
+    --primary: 269 55% 31%;
+    --primary-foreground: 0 0% 100%;
+
+    /* SOFT PINK SECONDARY */
+    --secondary: 320 60% 96%;
+    --secondary-foreground: 269 55% 31%;
+
+    /* LIGHT MUTED */
+    --muted: 300 25% 96%;
+    --muted-foreground: 260 15% 45%;
+
+    /* FEMININE ACCENT */
+    --accent: 326 70% 96%;
+    --accent-foreground: 269 55% 31%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 300 25% 90%;
+    --input: 300 25% 90%;
+
+    /* IMPORTANT — removes teal focus */
+    --ring: 326 55% 60%;
+
+    --radius: 1rem;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 262 55% 18%;
+    --sidebar-primary: 269 55% 31%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 320 60% 96%;
+    --sidebar-accent-foreground: 269 55% 31%;
+    --sidebar-border: 300 25% 90%;
+    --sidebar-ring: 326 55% 60%;
+  }
+
+  .dark {
+    --background: 262 45% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 262 45% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 262 45% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 326 70% 65%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 262 30% 18%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 262 30% 18%;
+    --muted-foreground: 300 10% 70%;
+
+    --accent: 320 40% 20%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 262 25% 22%;
+    --input: 262 25% 22%;
+
+    --ring: 326 55% 60%;
+
+    --sidebar-background: 262 45% 12%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 326 70% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 262 30% 18%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 262 25% 22%;
+    --sidebar-ring: 326 55% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: Inter, sans-serif;
+  }
+}

@@ -17,6 +17,8 @@ use App\Http\Controllers\PrescriptionTemplateController;
 use App\Http\Controllers\LabTestTemplateController;
 use App\Http\Controllers\PrescriptionController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\PregnancyVisitController;
+use App\Http\Controllers\PregnantVisitController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -92,6 +94,14 @@ Route::post('/visits', [VisitController::class, 'store']);
 Route::put('/visits/{id}', [VisitController::class, 'update']);
 Route::delete('/visits/{id}', [VisitController::class, 'destroy']);
 Route::get('/dashboard/recent-visits', [VisitController::class, 'recent']);
+Route::post('/pregnant-visits', [PregnantVisitController::class, 'store']);
+Route::put('/pregnant-visits/{visitId}', [PregnantVisitController::class, 'update']);
+
+Route::get('/patients/{patient}/pregnancy-visits', [PregnancyVisitController::class, 'index']);
+Route::post('/patients/{patient}/pregnancy-visits', [PregnancyVisitController::class, 'store']);
+Route::get('/pregnancy-visits/{id}', [PregnancyVisitController::class, 'show']);
+Route::put('/pregnancy-visits/{id}', [PregnancyVisitController::class, 'update']);
+Route::delete('/pregnancy-visits/{id}', [PregnancyVisitController::class, 'destroy']);
 
 Route::get('/attachments/{patientId}', [AttachmentController::class, 'index']);
 Route::post('/attachments', [AttachmentController::class, 'store']);

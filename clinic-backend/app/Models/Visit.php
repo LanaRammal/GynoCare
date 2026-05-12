@@ -8,6 +8,7 @@ class Visit extends Model
 {
     protected $fillable = [
     'patient_id',
+    'visit_type',
     'visit_date',
     'symptoms',
     'diagnosis',
@@ -18,5 +19,15 @@ class Visit extends Model
 public function patient()
 {
     return $this->belongsTo(Patient::class);
+}
+
+public function pregnantVisitDetail()
+{
+    return $this->hasOne(PregnantVisitDetail::class);
+}
+
+public function prescriptions()
+{
+    return $this->hasMany(Prescription::class);
 }
 }

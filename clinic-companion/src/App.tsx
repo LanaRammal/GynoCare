@@ -9,6 +9,8 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Patients from "./pages/Patients";
 import PatientProfile from "./pages/PatientProfile";
+import PregnancyVisitDetails from "./pages/PregnancyVisitDetails";
+import PregnancyVisitForm from "./pages/PregnancyVisitForm";
 import Templates from "./pages/Templates";
 import Appointments from "./pages/Appointments";
 import Billing from "./pages/Billing";
@@ -47,6 +49,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <PatientProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/patients/:patientId/pregnancy-visits/new"
+              element={
+                <ProtectedRoute>
+                  <PregnancyVisitForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pregnancy-visits/:visitId"
+              element={
+                <ProtectedRoute>
+                  <PregnancyVisitDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pregnancy-visits/:visitId/edit"
+              element={
+                <ProtectedRoute>
+                  <PregnancyVisitForm />
                 </ProtectedRoute>
               }
             />

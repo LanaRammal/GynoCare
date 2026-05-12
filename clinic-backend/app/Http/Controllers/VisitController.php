@@ -10,6 +10,7 @@ class VisitController extends Controller
     public function index($patientId)
     {
         return Visit::where('patient_id', $patientId)
+            ->with(['pregnantVisitDetail', 'prescriptions'])
             ->orderBy('visit_date', 'desc')
             ->get();
     }
@@ -24,7 +25,14 @@ class VisitController extends Controller
 {
     $visit = Visit::findOrFail($id);
     $visit->update($request->all());
-    return response()->json($visit);
+    if ($request->has('pregnant_visit_detail')) {
+        $visit->pregnantVisitDetail()->updateOrCreate(
+            ['visit_id' => $visit->id],
+            $request->input('pregnant_visit_detail') ?? []
+        );
+    }
+
+    return response()->json($visit->load(['pregnantVisitDetail', 'prescriptions']));
 }
 public function destroy($id)
 {
@@ -35,6 +43,7 @@ public function destroy($id)
 public function recent()
 {
     return Visit::with('patient:id,first_name,last_name')
+        ->with('pregnantVisitDetail')
         ->orderBy('visit_date', 'desc')
         ->limit(10)
         ->get();

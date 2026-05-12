@@ -50,8 +50,32 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { generatePatientPDF, generatePrescriptionPDF } from "@/lib/pdf";
+import { API_BASE, printPregnancyVisit } from "@/lib/pregnancyVisits";
 
 const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const presentationOptions = ["Cephalic", "Breech", "Transverse"];
+const plusMinusOptions = ["+", "-"];
+const pretermLaborOptions = ["G", "O"];
+
+const newPregnantVisitForm = () => ({
+  visit_date: format(new Date(), "yyyy-MM-dd"),
+  week: "",
+  weight: "",
+  presentation: "",
+  fhr: "",
+  fetal_movement: "",
+  preterm_labor_signs: "",
+  symptoms: "",
+  cervix_exam_wl: "",
+  cervix_exam_eff: "",
+  cervix_exam_sa: "",
+  blood_pressure: "",
+  edema: "",
+  urine: "",
+  follow_up_date: "",
+  cost: "",
+  comment: "",
+});
 
 const PatientProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +86,10 @@ const PatientProfile = () => {
   const [visitOpen, setVisitOpen] = useState(false);
   const [editVisitOpen, setEditVisitOpen] = useState(false);
   const [editVisit, setEditVisit] = useState<any>(null);
+  const [pregnantVisitOpen, setPregnantVisitOpen] = useState(false);
+  const [editingPregnantVisitId, setEditingPregnantVisitId] = useState<
+    string | null
+  >(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteVisitOpen, setDeleteVisitOpen] = useState(false);
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
@@ -71,10 +99,19 @@ const PatientProfile = () => {
   const [billingDescription, setBillingDescription] = useState("");
   const [lastVisitId, setLastVisitId] = useState<string | null>(null);
   const [showTemplatePopup, setShowTemplatePopup] = useState(false);
+  const [showPregnantTemplatePopup, setShowPregnantTemplatePopup] =
+    useState(false);
   const [caseWasManual, setCaseWasManual] = useState(false);
   const [medicationWasManual, setMedicationWasManual] = useState(false);
+  const [pregnantMedicationWasManual, setPregnantMedicationWasManual] =
+    useState(false);
+  const [pregnantLabWasManual, setPregnantLabWasManual] = useState(false);
   const [saveCaseTemplate, setSaveCaseTemplate] = useState(false);
   const [saveMedicationTemplates, setSaveMedicationTemplates] = useState(false);
+  const [savePregnantMedicationTemplates, setSavePregnantMedicationTemplates] =
+    useState(false);
+  const [savePregnantLabTemplates, setSavePregnantLabTemplates] =
+    useState(false);
 
   const { data: patient, isLoading } = useQuery({
     queryKey: ["patient", id],
@@ -96,6 +133,18 @@ const PatientProfile = () => {
       if (!response.ok) throw new Error("Failed to fetch visits");
       return await response.json();
     },
+  });
+
+  const { data: pregnancyVisits = [] } = useQuery({
+    queryKey: ["pregnancy-visits", id],
+    queryFn: async () => {
+      const response = await fetch(
+        `${API_BASE}/patients/${id}/pregnancy-visits`,
+      );
+      if (!response.ok) throw new Error("Failed to fetch pregnancy visits");
+      return await response.json();
+    },
+    enabled: !!id,
   });
 
   const { data: prescriptions = [] } = useQuery({
@@ -251,6 +300,18 @@ const PatientProfile = () => {
       instructions: string;
     }[]
   >([]);
+  const [pregnantVisitForm, setPregnantVisitForm] = useState(
+    newPregnantVisitForm(),
+  );
+  const [pregnantRxList, setPregnantRxList] = useState<
+    {
+      medication_name: string;
+      dosage: string;
+      frequency: string;
+      duration: string;
+      instructions: string;
+    }[]
+  >([]);
 
   const addVisit = useMutation({
     mutationFn: async () => {
@@ -317,6 +378,99 @@ const PatientProfile = () => {
       setBillingAmount("");
       setBillingDescription(visitForm.diagnosis || "Visit consultation");
       setBillingOpen(true);
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const resetPregnantVisitState = () => {
+    setPregnantVisitForm(newPregnantVisitForm());
+    setPregnantRxList([]);
+    setEditingPregnantVisitId(null);
+    setPregnantMedicationWasManual(false);
+    setPregnantLabWasManual(false);
+    setSavePregnantMedicationTemplates(false);
+    setSavePregnantLabTemplates(false);
+  };
+
+  const openPregnantVisitForm = (visit?: any) => {
+    if (visit) {
+      const detail = visit.pregnant_visit_detail || {};
+      setEditingPregnantVisitId(String(visit.id));
+      setPregnantVisitForm({
+        visit_date: visit.visit_date || format(new Date(), "yyyy-MM-dd"),
+        week: detail.week ? String(detail.week) : "",
+        weight: detail.weight || "",
+        presentation: detail.presentation || "",
+        fhr: detail.fhr || "",
+        fetal_movement: detail.fetal_movement || "",
+        preterm_labor_signs: detail.preterm_labor_signs || "",
+        symptoms: detail.symptoms || visit.symptoms || "",
+        cervix_exam_wl: detail.cervix_exam_wl || "",
+        cervix_exam_eff: detail.cervix_exam_eff || "",
+        cervix_exam_sa: detail.cervix_exam_sa || "",
+        blood_pressure: detail.blood_pressure || "",
+        edema: detail.edema || "",
+        urine: detail.urine || "",
+        follow_up_date: visit.follow_up_date || "",
+        cost: detail.cost ? String(detail.cost) : "",
+        comment: detail.comment || "",
+      });
+      setPregnantRxList(
+        (visit.prescriptions || []).map((rx) => ({
+          medication_name: rx.medication_name || "",
+          dosage: rx.dosage || "",
+          frequency: rx.frequency || "",
+          duration: rx.duration || "",
+          instructions: rx.instructions || "",
+        })),
+      );
+    } else {
+      resetPregnantVisitState();
+    }
+
+    setPregnantVisitOpen(true);
+  };
+
+  const savePregnantVisit = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(
+        editingPregnantVisitId
+          ? `http://127.0.0.1:8000/api/pregnant-visits/${editingPregnantVisitId}`
+          : "http://127.0.0.1:8000/api/pregnant-visits",
+        {
+          method: editingPregnantVisitId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...pregnantVisitForm,
+            patient_id: Number(id),
+            week: pregnantVisitForm.week ? Number(pregnantVisitForm.week) : null,
+            cost: pregnantVisitForm.cost
+              ? Number(pregnantVisitForm.cost)
+              : null,
+            medications: pregnantRxList,
+          }),
+        },
+      );
+
+      if (!response.ok) throw new Error("Failed to save pregnant visit");
+      return response.json();
+    },
+    onSuccess: (visit) => {
+      const wasEditing = Boolean(editingPregnantVisitId);
+      queryClient.invalidateQueries({ queryKey: ["visits", id] });
+      queryClient.invalidateQueries({ queryKey: ["prescriptions", id] });
+      setPregnantVisitOpen(false);
+      resetPregnantVisitState();
+      toast.success(wasEditing ? "Pregnant visit updated" : "Pregnant visit added");
+
+      if (!wasEditing) {
+        setLastVisitId(String(visit.id));
+        setBillingAmount(
+          pregnantVisitForm.cost ? String(pregnantVisitForm.cost) : "",
+        );
+        setBillingDescription("Pregnant visit consultation");
+        setBillingOpen(true);
+      }
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -397,6 +551,49 @@ const PatientProfile = () => {
       `http://127.0.0.1:8000/api/attachments/download/${attachmentId}`,
       "_blank",
     );
+  };
+
+  const printPregnantFollowUp = (visit: any) => {
+    const detail = visit.pregnant_visit_detail || {};
+    const rows = [
+      ["Visit Date", visit.visit_date ? format(new Date(visit.visit_date), "MMM d, yyyy") : "-"],
+      ["Week", detail.week || "-"],
+      ["Weight", detail.weight || "-"],
+      ["Presentation", detail.presentation || "-"],
+      ["FHR", detail.fhr || "-"],
+      ["Fetal Movement", detail.fetal_movement || "-"],
+      ["Preterm Labor Signs", detail.preterm_labor_signs || "-"],
+      ["Symptoms", detail.symptoms || visit.symptoms || "-"],
+      ["Cervix WL", detail.cervix_exam_wl || "-"],
+      ["Cervix Eff", detail.cervix_exam_eff || "-"],
+      ["Cervix SA", detail.cervix_exam_sa || "-"],
+      ["Blood Pressure", detail.blood_pressure || "-"],
+      ["Edema", detail.edema || "-"],
+      ["Urine", detail.urine || "-"],
+      ["Follow-up", visit.follow_up_date ? format(new Date(visit.follow_up_date), "MMM d, yyyy") : "-"],
+      ["Cost", detail.cost || "-"],
+      ["Comment", detail.comment || "-"],
+    ];
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Pregnant Visit</title>
+      <style>
+        body { font-family: Segoe UI, Arial, sans-serif; color: #25104f; padding: 32px; font-size: 13px; }
+        h1 { margin: 0 0 4px; } .header { border-bottom: 3px solid #c95c96; padding-bottom: 14px; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 18px; }
+        .label { color: #667085; font-size: 11px; text-transform: uppercase; } .value { font-weight: 600; white-space: pre-wrap; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f7f2fb; color: #667085; }
+        @media print { .no-print { display: none; } body { padding: 18px; } }
+      </style></head><body>
+      <button class="no-print" onclick="window.print()" style="float:right">Print</button>
+      <div class="header"><h1>Pregnant Visit</h1><div>${patient.first_name} ${patient.last_name}</div></div>
+      <div class="grid">${rows.map(([label, value]) => `<div><div class="label">${label}</div><div class="value">${value}</div></div>`).join("")}</div>
+      <table><thead><tr><th>Medication / Lab Test</th><th>Dosage</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead>
+      <tbody>${(visit.prescriptions || []).map((rx) => `<tr><td>${rx.medication_name}</td><td>${rx.dosage || "-"}</td><td>${rx.frequency || "-"}</td><td>${rx.duration || "-"}</td><td>${rx.instructions || "-"}</td></tr>`).join("") || `<tr><td colspan="5">No medications or lab tests.</td></tr>`}</tbody></table>
+      </body></html>`);
+    win.document.close();
+    win.onload = () => win.print();
   };
 
   if (isLoading) {
@@ -495,7 +692,7 @@ const PatientProfile = () => {
               <div>
                 <p className="text-sm text-slate-500">Visits</p>
                 <p className="text-2xl font-bold text-[#25104f] sm:text-3xl">
-                  {visits.length}
+                  {visits.length + pregnancyVisits.length}
                 </p>
               </div>
             </CardContent>
@@ -556,7 +753,8 @@ const PatientProfile = () => {
               value="visits"
               className="flex-1 gap-1 rounded-xl px-2 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4b237a] data-[state=active]:to-[#c95c96] data-[state=active]:text-white sm:flex-none sm:gap-2 sm:px-3 sm:text-sm"
             >
-              <FileText className="h-3.5 w-3.5" /> Visits ({visits.length})
+              <FileText className="h-3.5 w-3.5" /> Visits (
+              {visits.length + pregnancyVisits.length})
             </TabsTrigger>
             <TabsTrigger
               value="prescriptions"
@@ -700,13 +898,10 @@ const PatientProfile = () => {
                       className="h-11 rounded-2xl bg-gradient-to-r from-[#4b237a] to-[#c95c96] text-white shadow-md hover:opacity-90 sm:h-12"
                       onClick={() => {
                         setPregnancyPromptOpen(false);
-                        toast.info(
-                          "Pregnant visit form coming soon — using standard form for now.",
-                        );
-                        setVisitOpen(true);
+                        openPregnantVisitForm();
                       }}
                     >
-                      Pregnant
+                      Pregnant Visit
                     </Button>
                   </div>
                 </DialogContent>
@@ -723,12 +918,23 @@ const PatientProfile = () => {
                   </p>
                 </div>
 
-                <Button
-                  className="h-11 w-full rounded-2xl bg-gradient-to-r from-[#4b237a] to-[#c95c96] px-5 text-white shadow-lg hover:opacity-90 sm:h-12 sm:w-auto"
-                  onClick={() => setPregnancyPromptOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> New Visit
-                </Button>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                  <Button
+                    className="h-11 w-full rounded-2xl bg-gradient-to-r from-[#4b237a] to-[#c95c96] px-5 text-white shadow-lg hover:opacity-90 sm:h-12 sm:w-auto"
+                    onClick={() => setPregnancyPromptOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> New Visit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-11 w-full rounded-2xl border-pink-100 bg-white px-5 text-[#25104f] shadow-sm hover:bg-pink-50 sm:h-12 sm:w-auto"
+                    onClick={() =>
+                      navigate(`/patients/${id}/pregnancy-visits/new`)
+                    }
+                  >
+                    <HeartPulse className="mr-2 h-4 w-4" /> Open Pregnancy File
+                  </Button>
+                </div>
               </div>
 
               <Dialog open={visitOpen} onOpenChange={setVisitOpen}>
@@ -1195,7 +1401,222 @@ const PatientProfile = () => {
                 </DialogContent>
               </Dialog>
 
-              {visits.length === 0 ? (
+              <Dialog
+                open={pregnantVisitOpen}
+                onOpenChange={(open) => {
+                  setPregnantVisitOpen(open);
+                  if (!open) resetPregnantVisitState();
+                }}
+              >
+                <DialogContent className="max-h-[90vh] w-[95vw] max-w-4xl overflow-y-auto rounded-[2rem] border-purple-100 bg-white p-4 sm:p-6">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold text-[#25104f]">
+                      {editingPregnantVisitId ? "Edit Pregnant Visit" : "New Pregnant Visit"}
+                    </DialogTitle>
+                    <p className="text-sm text-slate-500">
+                      Follow-up details for an ongoing pregnancy.
+                    </p>
+                  </DialogHeader>
+
+                  <form
+                    className="mt-4 space-y-5"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (pregnantMedicationWasManual || pregnantLabWasManual) {
+                        setShowPregnantTemplatePopup(true);
+                      } else {
+                        savePregnantVisit.mutate();
+                      }
+                    }}
+                  >
+                    <div className="rounded-3xl border border-purple-100 bg-white/80 p-4 shadow-sm sm:p-5">
+                      <h3 className="mb-4 flex items-center gap-2 font-semibold text-[#25104f]">
+                        <HeartPulse className="h-4 w-4 text-pink-500" /> Pregnant Visit Details
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <Field label="Visit Date *" type="date" required value={pregnantVisitForm.visit_date} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, visit_date: v }))} />
+                        <Field label="Week" type="number" value={pregnantVisitForm.week} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, week: v }))} />
+                        <Field label="Weight" value={pregnantVisitForm.weight} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, weight: v }))} />
+                        <SelectInline label="Presentation" value={pregnantVisitForm.presentation} values={presentationOptions} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, presentation: v }))} />
+                        <SelectInline label="FHR" value={pregnantVisitForm.fhr} values={plusMinusOptions} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, fhr: v }))} />
+                        <SelectInline label="Fetal Movement" value={pregnantVisitForm.fetal_movement} values={plusMinusOptions} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, fetal_movement: v }))} />
+                        <SelectInline label="Preterm Labor Signs" value={pregnantVisitForm.preterm_labor_signs} values={pretermLaborOptions} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, preterm_labor_signs: v }))} />
+                        <Field label="Blood Pressure" value={pregnantVisitForm.blood_pressure} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, blood_pressure: v }))} />
+                        <SelectInline label="Edema" value={pregnantVisitForm.edema} values={plusMinusOptions} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, edema: v }))} />
+                        <SelectInline label="Urine" value={pregnantVisitForm.urine} values={plusMinusOptions} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, urine: v }))} />
+                        <Field label="Follow-up Date" type="date" value={pregnantVisitForm.follow_up_date} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, follow_up_date: v }))} />
+                        <Field label="Cost" type="number" value={pregnantVisitForm.cost} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, cost: v }))} />
+                      </div>
+                      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                        <Field label="Cervix WL" value={pregnantVisitForm.cervix_exam_wl} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, cervix_exam_wl: v }))} />
+                        <Field label="Cervix Eff" value={pregnantVisitForm.cervix_exam_eff} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, cervix_exam_eff: v }))} />
+                        <Field label="Cervix SA" value={pregnantVisitForm.cervix_exam_sa} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, cervix_exam_sa: v }))} />
+                      </div>
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                        <TextInline label="Symptoms" value={pregnantVisitForm.symptoms} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, symptoms: v }))} />
+                        <TextInline label="Comment" value={pregnantVisitForm.comment} onChange={(v) => setPregnantVisitForm((p) => ({ ...p, comment: v }))} />
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-purple-100 bg-gradient-to-br from-purple-50 to-pink-50 p-5 shadow-sm">
+                      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <Label className="flex items-center gap-2 text-base font-semibold text-[#25104f]">
+                          <Pill className="h-4 w-4 text-pink-600" /> Medications & Lab Tests
+                        </Label>
+                        <div className="flex w-full flex-wrap gap-2 lg:w-auto">
+                          {rxTemplates.length > 0 && (
+                            <Select
+                              onValueChange={(val) => {
+                                const rt = rxTemplates.find((r) => r.id === val);
+                                const meds = (rt?.medications || []) as any[];
+                                setPregnantRxList([...pregnantRxList, ...meds]);
+                              }}
+                            >
+                              <SelectTrigger className="h-9 w-full rounded-xl border-purple-100 bg-white text-xs sm:w-[160px]">
+                                <SelectValue placeholder="Load Rx..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {rxTemplates.map((rt) => (
+                                  <SelectItem key={rt.id} value={rt.id}>{rt.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          {labTemplates.length > 0 && (
+                            <Select
+                              onValueChange={(val) => {
+                                const lt = labTemplates.find((l) => l.id === val);
+                                const tests = ((lt?.tests || []) as any[]).map((t) => ({
+                                  medication_name: t.test_name,
+                                  dosage: "Lab Test",
+                                  frequency: "",
+                                  duration: "",
+                                  instructions: t.instructions,
+                                }));
+                                setPregnantRxList([...pregnantRxList, ...tests]);
+                              }}
+                            >
+                              <SelectTrigger className="h-9 w-full rounded-xl border-purple-100 bg-white text-xs sm:w-[170px]">
+                                <SelectValue placeholder="Load Lab Tests..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {labTemplates.map((lt) => (
+                                  <SelectItem key={lt.id} value={lt.id}>{lt.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-purple-100 bg-white text-[#25104f] hover:bg-purple-50" onClick={() => {
+                            setPregnantRxList([...pregnantRxList, { medication_name: "", dosage: "", frequency: "", duration: "", instructions: "" }]);
+                            setPregnantMedicationWasManual(true);
+                          }}>
+                            <Plus className="mr-1 h-3.5 w-3.5" /> Add Medication
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" className="rounded-xl border-purple-100 bg-white text-[#25104f] hover:bg-purple-50" onClick={() => {
+                            setPregnantRxList([...pregnantRxList, { medication_name: "", dosage: "Lab Test", frequency: "", duration: "", instructions: "" }]);
+                            setPregnantLabWasManual(true);
+                          }}>
+                            <Plus className="mr-1 h-3.5 w-3.5" /> Add Lab Test
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        {pregnantRxList.map((rx, i) => (
+                          <div key={i} className="relative rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                              <Input placeholder={rx.dosage === "Lab Test" ? "Lab test *" : "Medication *"} required value={rx.medication_name} onChange={(e) => {
+                                const n = [...pregnantRxList];
+                                n[i].medication_name = e.target.value;
+                                setPregnantRxList(n);
+                                rx.dosage === "Lab Test" ? setPregnantLabWasManual(true) : setPregnantMedicationWasManual(true);
+                              }} className="rounded-xl border-purple-100" />
+                              <Input placeholder="Dosage / Type" value={rx.dosage} onChange={(e) => {
+                                const n = [...pregnantRxList];
+                                n[i].dosage = e.target.value;
+                                setPregnantRxList(n);
+                              }} className="rounded-xl border-purple-100" />
+                              <Input placeholder="Frequency" value={rx.frequency} onChange={(e) => {
+                                const n = [...pregnantRxList];
+                                n[i].frequency = e.target.value;
+                                setPregnantRxList(n);
+                              }} className="rounded-xl border-purple-100" />
+                              <Input placeholder="Duration" value={rx.duration} onChange={(e) => {
+                                const n = [...pregnantRxList];
+                                n[i].duration = e.target.value;
+                                setPregnantRxList(n);
+                              }} className="rounded-xl border-purple-100" />
+                              <Input placeholder="Instructions" value={rx.instructions} onChange={(e) => {
+                                const n = [...pregnantRxList];
+                                n[i].instructions = e.target.value;
+                                setPregnantRxList(n);
+                              }} className="rounded-xl border-purple-100" />
+                            </div>
+                            <Button type="button" variant="ghost" size="icon" className="absolute -right-2 -top-2 h-7 w-7 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600" onClick={() => setPregnantRxList(pregnantRxList.filter((_, j) => j !== i))}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Button type="submit" disabled={savePregnantVisit.isPending} className="h-12 w-full rounded-2xl bg-gradient-to-r from-[#4b237a] to-[#c95c96] text-white shadow-lg hover:opacity-90">
+                      {savePregnantVisit.isPending ? "Saving Pregnant Visit..." : "Save Pregnant Visit"}
+                    </Button>
+                  </form>
+
+                  {showPregnantTemplatePopup && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                      <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-xl">
+                        <h2 className="text-lg font-bold text-[#25104f] sm:text-xl">Save to Templates?</h2>
+                        <p className="mt-1 text-sm text-slate-500">Save manually entered pregnant visit items for future visits.</p>
+                        <div className="mt-5 space-y-3">
+                          {pregnantMedicationWasManual && (
+                            <label className="flex items-center gap-3 rounded-2xl border border-purple-100 bg-purple-50/50 p-3 text-sm text-[#25104f]">
+                              <input type="checkbox" checked={savePregnantMedicationTemplates} onChange={(e) => setSavePregnantMedicationTemplates(e.target.checked)} />
+                              Add medications to prescription templates
+                            </label>
+                          )}
+                          {pregnantLabWasManual && (
+                            <label className="flex items-center gap-3 rounded-2xl border border-pink-100 bg-pink-50/50 p-3 text-sm text-[#25104f]">
+                              <input type="checkbox" checked={savePregnantLabTemplates} onChange={(e) => setSavePregnantLabTemplates(e.target.checked)} />
+                              Add lab tests to lab test templates
+                            </label>
+                          )}
+                        </div>
+                        <div className="mt-6 flex justify-end gap-3">
+                          <Button type="button" variant="outline" className="rounded-2xl border-purple-100" onClick={() => {
+                            setShowPregnantTemplatePopup(false);
+                            savePregnantVisit.mutate();
+                          }}>Skip</Button>
+                          <Button type="button" className="rounded-2xl bg-gradient-to-r from-[#4b237a] to-[#c95c96] text-white" onClick={async () => {
+                            setShowPregnantTemplatePopup(false);
+                            const medications = pregnantRxList.filter((rx) => rx.medication_name && rx.dosage !== "Lab Test");
+                            const labs = pregnantRxList.filter((rx) => rx.medication_name && rx.dosage === "Lab Test");
+                            if (savePregnantMedicationTemplates && medications.length > 0) {
+                              await fetch("http://127.0.0.1:8000/api/prescription-templates", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                                body: JSON.stringify({ name: medications[0].medication_name || "Pregnant Visit Medications", medications }),
+                              });
+                            }
+                            if (savePregnantLabTemplates && labs.length > 0) {
+                              await fetch("http://127.0.0.1:8000/api/lab-test-templates", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                                body: JSON.stringify({ name: labs[0].medication_name || "Pregnant Visit Lab Tests", tests: labs.map((lab) => ({ test_name: lab.medication_name, instructions: lab.instructions })) }),
+                              });
+                            }
+                            savePregnantVisit.mutate();
+                          }}>Continue</Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              {visits.length === 0 && pregnancyVisits.length === 0 ? (
                 <Card className="rounded-[2rem] border-dashed border-purple-200 bg-white/75 shadow-sm backdrop-blur-xl">
                   <CardContent className="px-4 py-10 text-center sm:py-12">
                     <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-700">
@@ -1211,6 +1632,89 @@ const PatientProfile = () => {
                 </Card>
               ) : (
                 <div className="space-y-4">
+                  {pregnancyVisits.map((visit) => (
+                    <Card
+                      key={`pregnancy-${visit.id}`}
+                      className="overflow-hidden rounded-[2rem] border border-pink-100 bg-white/80 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-lg"
+                    >
+                      <CardHeader className="border-b border-pink-100 bg-gradient-to-r from-pink-50 to-purple-50 pb-4">
+                        <div className="flex items-start justify-between gap-4 max-md:flex-col">
+                          <div>
+                            <Badge className="mb-2 rounded-full bg-pink-100 text-pink-700 hover:bg-pink-100">
+                              Pregnancy File
+                            </Badge>
+                            <CardTitle className="flex items-center gap-2 text-lg font-bold text-[#25104f]">
+                              <HeartPulse className="h-5 w-5 text-pink-500" />
+                              {visit.edd
+                                ? `EDD ${format(new Date(visit.edd), "MMMM d, yyyy")}`
+                                : `Created ${format(new Date(visit.created_at), "MMMM d, yyyy")}`}
+                            </CardTitle>
+                            <p className="mt-1 text-sm text-slate-500">
+                              G{visit.g || "-"} P{visit.pare || "-"} AB
+                              {visit.ab || "-"} · HIV {visit.hiv || "Unknown"} ·
+                              HBS {visit.hbs || "Unknown"}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 rounded-2xl border-purple-100 bg-white text-[#25104f] hover:bg-purple-50"
+                              onClick={() =>
+                                navigate(`/pregnancy-visits/${visit.id}`)
+                              }
+                            >
+                              <FileText className="h-3.5 w-3.5" /> View
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 rounded-2xl border-purple-100 bg-white text-[#25104f] hover:bg-purple-50"
+                              onClick={() =>
+                                navigate(`/pregnancy-visits/${visit.id}/edit`)
+                              }
+                            >
+                              <Edit className="h-3.5 w-3.5" /> Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 rounded-2xl border-purple-100 bg-white text-[#25104f] hover:bg-purple-50"
+                              onClick={() => printPregnancyVisit(visit)}
+                            >
+                              <Printer className="h-3.5 w-3.5" /> Print
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="grid gap-3 p-5 text-sm sm:grid-cols-2">
+                        <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
+                          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Patient
+                          </p>
+                          <p className="font-medium text-[#25104f]">
+                            {visit.name} {visit.family_name}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
+                          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Pregnancy Dates
+                          </p>
+                          <p className="font-medium text-[#25104f]">
+                            LMP{" "}
+                            {visit.lmp
+                              ? format(new Date(visit.lmp), "MMM d, yyyy")
+                              : "-"}{" "}
+                            · EDD{" "}
+                            {visit.edd
+                              ? format(new Date(visit.edd), "MMM d, yyyy")
+                              : "-"}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                   {visits.map((visit) => (
                     <Card
                       key={visit.id}
@@ -1219,8 +1723,17 @@ const PatientProfile = () => {
                       <CardHeader className="border-b border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 pb-4">
                         <div className="flex items-start justify-between gap-4 max-md:flex-col">
                           <div>
+                            {visit.visit_type === "pregnant" && (
+                              <Badge className="mb-2 rounded-full bg-pink-100 text-pink-700 hover:bg-pink-100">
+                                Pregnant Visit
+                              </Badge>
+                            )}
                             <CardTitle className="flex items-center gap-2 text-lg font-bold text-[#25104f]">
-                              <CalendarDays className="h-5 w-5 text-pink-500" />
+                              {visit.visit_type === "pregnant" ? (
+                                <HeartPulse className="h-5 w-5 text-pink-500" />
+                              ) : (
+                                <CalendarDays className="h-5 w-5 text-pink-500" />
+                              )}
                               {format(
                                 new Date(visit.visit_date),
                                 "MMMM d, yyyy",
@@ -1246,12 +1759,26 @@ const PatientProfile = () => {
                               size="sm"
                               className="gap-2 rounded-2xl border-purple-100 bg-white text-[#25104f] hover:bg-purple-50"
                               onClick={() => {
-                                setEditVisit(visit);
-                                setEditVisitOpen(true);
+                                if (visit.visit_type === "pregnant") {
+                                  openPregnantVisitForm(visit);
+                                } else {
+                                  setEditVisit(visit);
+                                  setEditVisitOpen(true);
+                                }
                               }}
                             >
                               <Edit className="h-3.5 w-3.5" /> Edit
                             </Button>
+                            {visit.visit_type === "pregnant" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 rounded-2xl border-purple-100 bg-white text-[#25104f] hover:bg-purple-50"
+                                onClick={() => printPregnantFollowUp(visit)}
+                              >
+                                <Printer className="h-3.5 w-3.5" /> Print
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
@@ -1269,6 +1796,31 @@ const PatientProfile = () => {
 
                       <CardContent className="space-y-4 p-5 text-sm">
                         <div className="grid gap-3 sm:grid-cols-2">
+                          {visit.visit_type === "pregnant" &&
+                            visit.pregnant_visit_detail && (
+                              <>
+                                <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
+                                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+                                    Pregnancy Follow-up
+                                  </p>
+                                  <p className="font-medium text-[#25104f]">
+                                    Week {visit.pregnant_visit_detail.week || "-"} · Weight{" "}
+                                    {visit.pregnant_visit_detail.weight || "-"} ·{" "}
+                                    {visit.pregnant_visit_detail.presentation || "No presentation"}
+                                  </p>
+                                </div>
+                                <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
+                                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+                                    Monitoring
+                                  </p>
+                                  <p className="font-medium text-[#25104f]">
+                                    FHR {visit.pregnant_visit_detail.fhr || "-"} · FM{" "}
+                                    {visit.pregnant_visit_detail.fetal_movement || "-"} · BP{" "}
+                                    {visit.pregnant_visit_detail.blood_pressure || "-"}
+                                  </p>
+                                </div>
+                              </>
+                            )}
                           {visit.symptoms && (
                             <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
                               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
@@ -1838,5 +2390,54 @@ const PatientProfile = () => {
     </AppLayout>
   );
 };
+
+const Field = ({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+}: any) => (
+  <div className="space-y-2">
+    <Label>{label}</Label>
+    <Input
+      type={type}
+      required={required}
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-11 rounded-2xl border-purple-100 bg-purple-50/40"
+    />
+  </div>
+);
+
+const TextInline = ({ label, value, onChange }: any) => (
+  <div className="space-y-2">
+    <Label>{label}</Label>
+    <Textarea
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      rows={3}
+      className="rounded-2xl border-purple-100 bg-purple-50/30"
+    />
+  </div>
+);
+
+const SelectInline = ({ label, value, values, onChange }: any) => (
+  <div className="space-y-2">
+    <Label>{label}</Label>
+    <Select value={value || ""} onValueChange={onChange}>
+      <SelectTrigger className="h-11 rounded-2xl border-purple-100 bg-purple-50/40">
+        <SelectValue placeholder="Select" />
+      </SelectTrigger>
+      <SelectContent>
+        {values.map((item: string) => (
+          <SelectItem key={item} value={item}>
+            {item}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+);
 
 export default PatientProfile;
